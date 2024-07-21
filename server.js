@@ -2,6 +2,7 @@
 const express = require('express');
 const fileSystem = require('fs');
 const csvParser = require('csv-parser');
+const archiver = require('archiver');
 const app = express();
 
 /**
@@ -16,7 +17,7 @@ app.get('/:stock/:number', (req, res) => {
     /**
      * Read all files in stock directory
      */
-    fileSystem.readdir('./'+ stock, (error, foundFiles) => {
+    fileSystem.readdir('./'+ stock, async (error, foundFiles) => {
         if(error) {
             // return alert pop-up if stock does not exist
             return res.send(`<script> alert("Stock ${stock} was not found") </script>`);
@@ -33,6 +34,12 @@ app.get('/:stock/:number', (req, res) => {
 
         // Get the exact number of files and remove extention
         selectedFiles = foundFiles.slice(0, numberOfFiles).map(elem => elem = elem.split('.')[0]);
+
+
+        // Extra Validation
+        if (selectedFiles.length === 0) {
+            return res.send(`<script> alert("No values in Stock: ${stock}") </script>`);
+        }
 
         // Declare matrix to store data
         const readData = [];
@@ -51,12 +58,58 @@ app.get('/:stock/:number', (req, res) => {
                 const randomElementIndex = Math.floor(Math.random() * (readData[index].length - 10));
                 const valuesToForecat = readData[index].slice(randomElementIndex, randomElementIndex + 10);
 
+                // Apply SimpleMovingAverage
                 const forecast = applySimpleMovingAverage(valuesToForecat);
+
+                // Write new csv files with forecasted values
                 fileSystem.writeFileSync(elem + "-forecasted.csv", forecast.map(elemF => elemF.StockID + ',' + elemF.Timestamp + ',' + elemF.Price).join('\n'), 'utf8');
             })
         })
+        
+        // FIXME: Quick fix to resolve Async
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        return res.send('Stock: ' + stock + " Number: " + numberOfFiles);
+        // Create archive if more then one file
+        if (selectedFiles.length > 1) {
+            const outputZip = fileSystem.createWriteStream('./forecastedFile.zip');
+            const archive = archiver('zip', {zlib: {level: 9}});
+
+            selectedFiles.forEach(elem => {
+                const finalFileName = elem + '-forecasted.csv';
+                archive.file(finalFileName, {name: finalFileName});
+            })
+
+            archive.finalize();
+            outputZip.on('close', () => {
+                // Download Archive
+                res.download('./forecastedFile.zip')
+            })
+            archive.pipe(outputZip)
+        } else {
+            // Download CSV file
+            res.download(selectedFiles[0] + '-forecasted.csv');
+        }
+        // const awaitedForecastedFiles = await new Promise((resolve) => {
+        //     const forecastedFiles = [];
+        //     //selectedFiles.forEach((elem, index) => {
+        //         fileSystem.createReadStream('./'+ stock + '/' + selectedFiles[0] +'.csv')
+        //         .pipe(csvParser(['StockID', 'Timestamp', 'Price']))
+        //         .on('data', (row) => {
+        //             readData[0].push(row);
+        //         })
+        //         .on('end', () => {
+        //             const randomElementIndex = Math.floor(Math.random() * (readData[0].length - 10));
+        //             const valuesToForecat = readData[0].slice(randomElementIndex, randomElementIndex + 10);
+    
+        //             const forecast = applySimpleMovingAverage(valuesToForecat);
+        //             fileSystem.writeFileSync(selectedFiles[0] + "-forecasted.csv", forecast.map(elemF => elemF.StockID + ',' + elemF.Timestamp + ',' + elemF.Price).join('\n'), 'utf8');
+        //             forecastedFiles.push(selectedFiles[0] + '-forecasted.csv');
+        //             resolve(forecastedFiles);
+        //         })
+        //     //})
+        // });
+
+        // return res.send('Stock: ' + stock + " Number: " + numberOfFiles);
     });
 });
 
