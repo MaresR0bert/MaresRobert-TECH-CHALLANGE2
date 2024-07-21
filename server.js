@@ -11,8 +11,12 @@ const app = express();
 app.get('/:stock/:number', (req, res) => {
 
     const stock = req.params.stock;
-    var numberOfFiles = req.params.number;
+    var numberOfFiles = parseInt(req.params.number);
     var selectedFiles = [];
+
+    if(numberOfFiles !== 1 && numberOfFiles !== 2){
+        return res.send(`<script> alert("1 or 2 are the only permitted values for the number of files to be computed.") </script>`);
+    }
 
     /**
      * Read all files in stock directory
@@ -86,7 +90,7 @@ app.get('/:stock/:number', (req, res) => {
             archive.pipe(outputZip)
         } else if (forecastedFiles.length === 1) {
             // Download CSV file
-            res.download(forecastedFiles[0] + '-forecasted.csv');
+            res.download(forecastedFiles[0]);
         } else {
             return res.send("No forcasted files");
         }
