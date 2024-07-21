@@ -82,8 +82,6 @@ app.get('/:number', async (req, res) => {
     } else if (forecastedFiles.length === 1) {
         // Download CSV file
         res.download(forecastedFiles[0]);
-    } else {
-        return res.send("No forcasted files");
     }
 });
 
