@@ -1,4 +1,3 @@
-// app.js
 const express = require('express');
 const fileSystem = require('fs');
 const csvParser = require('csv-parser');
@@ -8,93 +7,84 @@ const app = express();
 /**
  * First Function in Requirements, used to read CSV and Parse values
  */
-app.get('/:stock/:number', (req, res) => {
+app.get('/:number', async (req, res) => {
 
-    const stock = req.params.stock;
     var numberOfFiles = parseInt(req.params.number);
+    const stockExchanges = ['LSE', 'NASDAQ', 'NYSE'];
     var selectedFiles = [];
 
-    if(numberOfFiles !== 1 && numberOfFiles !== 2){
-        return res.send(`<script> alert("1 or 2 are the only permitted values for the number of files to be computed.") </script>`);
+    if (numberOfFiles !== 1 && numberOfFiles !== 2) {
+        return res.status(404).send(`<script> alert("1 or 2 are the only permitted values for the number of files to be computed.") </script>`);
     }
 
     /**
-     * Read all files in stock directory
+     * Get files according to volume intended
      */
-    fileSystem.readdir('./'+ stock, async (error, foundFiles) => {
-        if(error) {
-            // return alert pop-up if stock does not exist
-            return res.send(`<script> alert("Stock ${stock} was not found") </script>`);
-        }
+    stockExchanges.forEach(stockEx => {
+        const foundCsvFiles = fileSystem.readdirSync('./' + stockEx).filter(file => file.endsWith('.csv'));
+        const requiredFilesNumber = numberOfFiles > foundCsvFiles.length ? foundCsvFiles.length : numberOfFiles;
+        foundCsvFiles.slice(0, requiredFilesNumber).map(elem => elem = elem.split('.')[0]).forEach(file => {
+            selectedFiles.push(stockEx + '/' + file);
+        })
+    });
 
-        // Filter files in stock directory to only fetch .csv files
-        foundFiles = foundFiles.filter(file => file.endsWith('.csv'));
+    // Declare matrix to store data
+    const readData = [];
+    selectedFiles.forEach(() => readData.push([]));
 
-        /**
-         * Citetion from Requirements:
-         * If there aren’t enough files present for a given exchange, process whatever number of files are present even if it is lower.
-         */
-        numberOfFiles = numberOfFiles > foundFiles.length ? foundFiles.length : numberOfFiles;
+    /**
+     * Read all selected csv files asynchroniously, then forecasting the values using Simple Moving Average
+     */
+    const promiseQueue = selectedFiles.map((elem, index) => {
+        return new Promise((resolve, reject) => {
+            fileSystem.createReadStream('./' + elem + '.csv')
+                .pipe(csvParser(['StockID', 'Timestamp', 'Price']))
+                .on('data', (row) => {
+                    readData[index].push(row);
+                })
+                .on('end', () => {
+                    const randomElementIndex = Math.floor(Math.random() * (readData[index].length - 10));
+                    const valuesToForecat = readData[index].slice(randomElementIndex, randomElementIndex + 10);
 
-        // Get the exact number of files and remove extention
-        selectedFiles = foundFiles.slice(0, numberOfFiles).map(elem => elem = elem.split('.')[0]);
+                    const forecast = applySimpleMovingAverage(valuesToForecat);
 
+                    const forecastedFileName = elem.replace('/', "_") + "-forecasted.csv";
+                    fileSystem.writeFileSync(forecastedFileName,
+                        forecast.map(elemF => elemF.StockID + ',' + elemF.Timestamp + ',' + elemF.Price).join('\n'),
+                        'utf8');
+                    resolve(forecastedFileName);
+                })
+        })
+    })
 
-        // Extra Validation
-        if (selectedFiles.length === 0) {
-            return res.send(`<script> alert("No values in Stock: ${stock}") </script>`);
-        }
+    const forecastedFiles = await Promise.all(promiseQueue);
 
-        // Declare matrix to store data
-        const readData = [];
-        selectedFiles.forEach(() => readData.push([]));
+    if (forecastedFiles.length === 0) {
+        return res.status(404).send(`<script> alert("There are no stocks in database") </script>`);
+    }
 
-        /**
-         * Read all selected csv files asynchroniously, then forecasting the values using Simple Moving Average
-         */
-        const promiseQueue = selectedFiles.map((elem, index) => {
-            return new Promise((resolve, reject) => {
-                fileSystem.createReadStream('./'+ stock + '/' + elem +'.csv')
-                    .pipe(csvParser(['StockID', 'Timestamp', 'Price']))
-                    .on('data', (row) => {
-                        readData[index].push(row);
-                    })
-                    .on('end', () => {
-                        const randomElementIndex = Math.floor(Math.random() * (readData[index].length - 10));
-                        const valuesToForecat = readData[index].slice(randomElementIndex, randomElementIndex + 10);
-        
-                        const forecast = applySimpleMovingAverage(valuesToForecat);
-                        fileSystem.writeFileSync(elem + "-forecasted.csv", forecast.map(elemF => elemF.StockID + ',' + elemF.Timestamp + ',' + elemF.Price).join('\n'), 'utf8');
-                        resolve(elem + '-forecasted.csv');
-                    })
-            })
+    // Create archive if more then one file
+    if (forecastedFiles.length > 1) {
+        const outputZip = fileSystem.createWriteStream('./forecastedFile.zip');
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        forecastedFiles.forEach(elem => {
+            const finalFileName = elem;
+            archive.file(finalFileName, { name: finalFileName });
         })
 
-        const forecastedFiles = await Promise.all(promiseQueue);
-
-        // Create archive if more then one file
-        if (forecastedFiles.length > 1) {
-            const outputZip = fileSystem.createWriteStream('./forecastedFile.zip');
-            const archive = archiver('zip', {zlib: {level: 9}});
-
-            forecastedFiles.forEach(elem => {
-                const finalFileName = elem
-                archive.file(finalFileName, {name: finalFileName});
-            })
-
-            archive.finalize();
-            outputZip.on('close', () => {
-                // Download Archive
-                res.download('./forecastedFile.zip')
-            })
-            archive.pipe(outputZip)
-        } else if (forecastedFiles.length === 1) {
-            // Download CSV file
-            res.download(forecastedFiles[0]);
-        } else {
-            return res.send("No forcasted files");
-        }
-    });
+        archive.finalize();
+        outputZip.on('close', () => {
+            // Download Archive
+            res.download('./forecastedFile.zip')
+        })
+        archive.pipe(outputZip)
+    } else if (forecastedFiles.length === 1) {
+        // Download CSV file
+        res.download(forecastedFiles[0]);
+    } else {
+        return res.send("No forcasted files");
+    }
 });
 
 /**
@@ -106,9 +96,9 @@ app.get('/:stock/:number', (req, res) => {
  * Having a small sample of only 10 values the recommended amount of elements in the arithmetic average is about 3
  */
 const applySimpleMovingAverage = timeSeries => {
-    for(let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
         const tsLength = timeSeries.length;
-        
+
         // Arithmetic average and string parsing to number
         const forcastedPrice = (parseInt(timeSeries[tsLength - 1].Price) + parseInt(timeSeries[tsLength - 2].Price) + parseInt(timeSeries[tsLength - 3].Price)) / 3;
 

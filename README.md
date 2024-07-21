@@ -27,20 +27,18 @@ I herby declare that the presented solution is in its entirety the result of my 
 **How to test the solution:**
 * In order to test the solution the user may access the API through an internet browser's Address bar.
 * The server is running on port 7777 (a free port in Windows OS, as well as the default port for the popular indie game Terraria).
-* The API has only one endpoint that requires two path variables: The name of the stock and the number of files that may be computed.
+* The API has only one endpoint that requires one path variable: The number of files that may be computed.
 * Some examples of calls using the browser's address bar:<br/>
-`localhost:7777/LSE/2` -> Should initiate a download of a zip file containing 2 forecasted csv files.<br/>
-`localhost:7777/LSE/1` -> Should initiate a download of a single forecasted csv file.<br/>
-`localhost:7777/fffff/2` -> Should alert an error stating that there is no fffff stock<br/>
-`localhost:7777/FAKESTOCK/2` -> Should alert an error stating that there are no files in the FAKESTOCK directory. <br/>
-`localhost:7777/NASDAQ/2` -> Should initiate a download of a single forecasted csv file.<br/>
-`localhost:7777/NYSE/3` -> Should alert an error stating that the only values available for the number of files to be computed are 1 or 2.
+`localhost:7777/2` -> Should initiate a download of a zip file containing 5 forecasted csv files.<br/>
+`localhost:7777/1` -> Should initiate a download of a zip file containing 3 forecasted csv files.<br/>
+`localhost:7777/3` -> Should alert an error stating that the only values available for the number of files to be computed are 1 or 2.
 <br/>
 <br/>
 <br/>
 
 **Discussion:**
-* In the context of an API I considered the .csv files as a local database, thus a user may indicate the stock he is interested in forecasting by the `stock` variable in the path of the request.
+* In the context of an API I considered the .csv files as a local database, the user may only indicate the number of files from each StockExchange and the files will be computed
 * The forecasted files should indicate Output and are transmitted to the user through browser download protocol. In the case of multiple files, they may be archived, as modern browsers tend to stop an application from downloading multiple files at once for security reasons.
 * For the forecasting itself I wanted to use Simple Moving Average algoirthm (explained in code comments), since I used to use it frequently in my Statistics Classes.
 * The computed files get replaced with each computation. Deleting them would be incosistent as they need to be present for the download process.
+* In case there are no .csv files on local env, an alert stating that there are no stocks will be displayed
