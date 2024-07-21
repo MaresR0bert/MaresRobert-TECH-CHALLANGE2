@@ -28,13 +28,12 @@ I herby declare that the presented solution is in its entirety the result of my 
 * In order to test the solution the user may access the API through an internet browser's Address bar.
 * The server is running on port 7777 (a free port in Windows OS, as well as the default port for the popular indie game Terraria).
 * The API has only one endpoint that requires two path variables: The name of the stock and the number of files that may be computed.
-* Some examples of calls using the browser's address bar:
-<br/>
-`localhost:7777/LSE/2` -> Should initiate a download of a zip file containing 2 forecasted csv files.
-`localhost:7777/LSE/1` -> Should initiate a download of a single forecasted csv file.
-`localhost:7777/fffff/2` -> Should alert an error stating that there is no fffff stock
+* Some examples of calls using the browser's address bar:<br/>
+`localhost:7777/LSE/2` -> Should initiate a download of a zip file containing 2 forecasted csv files.<br/>
+`localhost:7777/LSE/1` -> Should initiate a download of a single forecasted csv file.<br/>
+`localhost:7777/fffff/2` -> Should alert an error stating that there is no fffff stock<br/>
 `localhost:7777/FAKESTOCK/2` -> Should alert an error stating that there are no files in the FAKESTOCK directory. <br/>
-`localhost:7777/NASDAQ/2` -> Should initiate a download of a single forecasted csv file.
+`localhost:7777/NASDAQ/2` -> Should initiate a download of a single forecasted csv file.<br/>
 `localhost:7777/NYSE/3` -> Should alert an error stating that the only values available for the number of files to be computed are 1 or 2.
 <br/>
 <br/>
